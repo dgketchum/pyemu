@@ -10,7 +10,6 @@ from ..pyemu_warnings import PyemuWarning
 import copy
 import string
 
-
 # the tolerable percent difference (100 * (max - min)/mean)
 # used when checking that constant and zone type parameters are in fact constant (within
 # a given zone)
@@ -117,7 +116,7 @@ class PstFrom(object):
         self.par_dfs = []
         self.unique_parnmes = set()  # set of unique parameters added so far through add_parameters method
         self.obs_dfs = []
-        self.py_run_file = "forward_run.py"
+        self.py_run_file = "custom_forward_run.py"
         self.mod_command = "python {0}".format(self.py_run_file)
         self.pre_py_cmds = []
         self.pre_sys_cmds = []  # a list of preprocessing commands to add to
@@ -158,7 +157,6 @@ class PstFrom(object):
         self.ult_lbound_fill = -1.0e30
         self.chunk_len = int(chunk_len)
         self.py_functions = set()
-
 
     @property
     def parfile_relations(self):
@@ -221,7 +219,7 @@ class PstFrom(object):
                     if x is not None
                     else lb_max["lbound"]
                 )
-        pr["zero_based"] = self.zero_based   # todo -- chase this out if going to file specific zero based def
+        pr["zero_based"] = self.zero_based  # todo -- chase this out if going to file specific zero based def
         return pr
 
     def _generic_get_xy(self, args, **kwargs):
@@ -266,10 +264,10 @@ class PstFrom(object):
             return i, j
         else:
             if (hasattr(self._spatial_reference, "grid_type") and
-                    self._spatial_reference.grid_type == 'vertex'):
+                self._spatial_reference.grid_type == 'vertex'):
                 return (
-                    self._spatial_reference.xcentergrid[i, ],
-                    self._spatial_reference.ycentergrid[i, ],
+                    self._spatial_reference.xcentergrid[i,],
+                    self._spatial_reference.ycentergrid[i,],
                 )
             else:
                 return (
@@ -286,9 +284,9 @@ class PstFrom(object):
                 self._spatial_ref_xarray = self._spatial_reference.xcellcenters
                 self._spatial_ref_yarray = self._spatial_reference.ycellcenters
             if (hasattr(self._spatial_reference, "grid_type") and
-                    self._spatial_reference.grid_type == 'vertex'):
-                return (self._spatial_ref_xarray[i, ],
-                        self._spatial_ref_yarray[i, ])
+                self._spatial_reference.grid_type == 'vertex'):
+                return (self._spatial_ref_xarray[i,],
+                        self._spatial_ref_yarray[i,])
 
             return (self._spatial_ref_xarray[i, j],
                     self._spatial_ref_yarray[i, j])
@@ -384,8 +382,11 @@ class PstFrom(object):
         with open(self.new_d / self.py_run_file, "w") as f:
             f.write(
                 "import os\nimport multiprocessing as mp\nimport numpy as np"
-                + "\nimport pandas as pd\n"
+                + "\nimport pandas as pd\nimport sys\nimport subprocessing"
             )
+            # TODO: resolve the conda activate problem
+
+            f.write("sys.path.append(r'{}')\n".format('/home/dgketchum/miniconda3/envs/mihm/lib/python3.9/site-packages'))
             f.write("import pyemu\n")
             for ex_imp in self.extra_py_imports:
                 f.write("import {0}\n".format(ex_imp))
@@ -605,7 +606,7 @@ class PstFrom(object):
         self.logger.log("drawing realizations")
         return pe.copy()
 
-    def build_pst(self, filename=None, update=False, version=1):
+    def build_pst(self, filename=None, update=False, version=1, write_py_file=False):
         """Build control file from i/o files in PstFrom object.
         Warning: This builds a pest control file from scratch, overwriting
         anything already in self.pst object and anything already writen to `filename`
@@ -735,7 +736,7 @@ class PstFrom(object):
                 par_data.loc[npd.index, 'longname'] = npd.parnme
                 # get short names (using existing names as index starting point)
                 par_data.loc[npd.index, "shortname"] = [
-                    'p' + f"{i}" for i in range(shtmx, shtmx+len(npd))
+                    'p' + f"{i}" for i in range(shtmx, shtmx + len(npd))
                 ]
                 # set to dict
                 parmap = par_data.loc[npd.index, "shortname"].to_dict()
@@ -764,7 +765,7 @@ class PstFrom(object):
                 pargpmap = pd.DataFrame(npd.pargp.unique(),
                                         columns=['longname'])
                 # shortnames from using previous a starting point (if existing)
-                pargpmap["shortname"] = "pg" + (pargpmap.index+gshtmx).astype(str)
+                pargpmap["shortname"] = "pg" + (pargpmap.index + gshtmx).astype(str)
                 pargpmap_dict = pargpmap.set_index('longname').shortname.to_dict()
                 par_data.loc[npd.index, "pglong"] = npd.pargp
                 par_data.loc[npd.index, 'pargp'] = npd.pargp.map(pargpmap_dict)
@@ -820,12 +821,12 @@ class PstFrom(object):
                 obs_data.loc[nod.index, "longname"] = nod.obsnme
                 # get short names (using existing names as index starting point)
                 obs_data.loc[nod.index, "shortname"] = [
-                    'ob' + f"{i}" for i in range(shtmx, shtmx+len(nod))
+                    'ob' + f"{i}" for i in range(shtmx, shtmx + len(nod))
                 ]
                 obsmap = obs_data.loc[nod.index, "shortname"].to_dict()
                 insmap = {str(Path(self.new_d, k)): v
                           for k, v in self.insfile_obsmap.items()
-                          if len(nod.index.intersection(v))>0}
+                          if len(nod.index.intersection(v)) > 0}
                 # rename obsnames and propagate to ins files
                 # pr2 = cProfile.Profile()
                 # pr2.enable()
@@ -843,7 +844,7 @@ class PstFrom(object):
                 obgpmap = pd.DataFrame(nod.obgnme.unique(),
                                        columns=['longname'])
                 # shortnames from using previous a starting point (if existing)
-                obgpmap["shortname"] = "obg" + (obgpmap.index+gshtmx).astype(str)
+                obgpmap["shortname"] = "obg" + (obgpmap.index + gshtmx).astype(str)
                 ltobs = obgpmap.longname.str.startswith(
                     pyemu.pst.pst_handler.get_constraint_tags('lt')
                 )
@@ -869,7 +870,8 @@ class PstFrom(object):
         self.pst = pst
         if version is not None:
             self.pst.write(filename, version=version)
-        self.write_forward_run()
+        if write_py_file:
+            self.write_forward_run()
         pst.try_parse_name_metadata()
         # pr.print_stats(sort="cumtime")
         # pr2.print_stats(sort="cumtime")
@@ -1119,8 +1121,8 @@ class PstFrom(object):
         return self._prefix_count[prefix]
 
     def add_py_function(
-            self, file_name, call_str=None, is_pre_cmd=True,
-            function_name=None
+        self, file_name, call_str=None, is_pre_cmd=True,
+        function_name=None
     ):
         """add a python function to the forward run script
 
@@ -1192,8 +1194,8 @@ class PstFrom(object):
                 "add_py_function(): call_str '{0}' missing paretheses".format(call_str)
             )
         function_name = call_str[
-            : call_str.find("(")
-        ]  # strip to first occurance of '('
+                        : call_str.find("(")
+                        ]  # strip to first occurance of '('
         if function_name in self.py_functions:
             # todo: could add more duplication options here: override, increment
             warnings.warn(
@@ -1324,11 +1326,13 @@ class PstFrom(object):
                         if jr < len(raw) - 1:
                             f_ins.write(" w ")
                         continue
-
                 oname = "oname:{0}_otype:arr_i:{1}_j:{2}".format(prefix, iidx, jr)
                 if zval is not None:
                     oname += "_zone:{0}".format(zval)
-                f_ins.write(" !{0}! ".format(oname))
+                # TODO: remove this hack by dgketchum
+                oname = '{}'.format(prefix)
+                f_ins.write(" !{}_{}! ".format(oname, str(iline).rjust(6, '0')))
+                # f_ins.write('{}_{}'.format(prefix, iline))
                 if jr < len(raw) - 1:
                     f_ins.write(" w ")
             f_ins.write("\n")
@@ -1979,7 +1983,7 @@ class PstFrom(object):
         )
         if geostruct is not None:
             self.logger.log("using geostruct:{0}".format(str(geostruct)))
-            if geostruct.sill != 1.0:  #  and par_style != "multiplier": #TODO !=?
+            if geostruct.sill != 1.0:  # and par_style != "multiplier": #TODO !=?
                 self.logger.warn(
                     "geostruct sill != 1.0"  # for 'multiplier' style parameters"
                 )
@@ -2001,11 +2005,11 @@ class PstFrom(object):
                 )
         # big sr and zone dependancy checker here: todo - tidy?
         checker = (
-                self._spatial_reference is not None
-                and not isinstance(self._spatial_reference, dict)
-                and self._spatial_reference.grid_type == 'vertex'
-                and zone_array is not None
-                and len(zone_array.shape) == 1
+            self._spatial_reference is not None
+            and not isinstance(self._spatial_reference, dict)
+            and self._spatial_reference.grid_type == 'vertex'
+            and zone_array is not None
+            and len(zone_array.shape) == 1
         )
         if checker:
             zone_array = np.reshape(zone_array, (zone_array.shape[0], 1))
@@ -2090,9 +2094,11 @@ class PstFrom(object):
                 pargp = pargp.lower()
         par_name_base = [pnb.lower() for pnb in par_name_base]
 
-
         fmt = "_{0}".format(alt_inst_str) + ":{0}"
         chk_prefix = "_{0}".format(alt_inst_str)  # add `instance` identifier
+
+        # # TODO; remove this hack by dgketchum
+        # par_name_base = pargp
 
         # increment name base if already passed
         for i in range(len(par_name_base)):
@@ -2103,9 +2109,9 @@ class PstFrom(object):
             # regardless of whether instance is to be included 
             # in the parameter names
             if i == 0:
-                inst = self._next_count(par_name_base[i] +\
+                inst = self._next_count(par_name_base[i] + \
                                         chk_prefix)
-                par_name_store = (par_name_base[0] + 
+                par_name_store = (par_name_base[0] +
                                   fmt.format(inst)).replace(":", "")
                 # if instance is to be included in the parameter names
                 # add the instance suffix to the parameter name base
@@ -2121,7 +2127,7 @@ class PstFrom(object):
         # multiplier file name will be taken first par group, if passed
         # (the same multipliers will apply to all pars passed in this call)
         # Remove `:` for filenames
-        #par_name_store = par_name_base[0].replace(":", "")  # for os filename
+        # par_name_store = par_name_base[0].replace(":", "")  # for os filename
 
         # Define requisite filenames
         if par_style in ["m", "a"]:
@@ -2217,6 +2223,7 @@ class PstFrom(object):
                 "writing list-style template file '{0}'".format(tpl_filename)
             )
         else:  # Assume array type parameter file
+
             self.logger.log(
                 "writing array-style template file '{0}'".format(tpl_filename)
             )
@@ -2293,21 +2300,21 @@ class PstFrom(object):
                             assert orgdata[0] == spatial_reference.ncpl, (
                                 "Spatial reference ncpl not equal to original data ncpl for\n"
                                 + os.path.join(
-                                    *os.path.split(self.original_file_d)[1:], mod_file
-                                )
+                                *os.path.split(self.original_file_d)[1:], mod_file
+                            )
                             )
                         else:
                             assert orgdata[0] == spatial_reference.nrow, (
                                 "Spatial reference nrow not equal to original data nrow for\n"
                                 + os.path.join(
-                                    *os.path.split(self.original_file_d)[1:], mod_file
-                                )
+                                *os.path.split(self.original_file_d)[1:], mod_file
+                            )
                             )
                             assert orgdata[1] == spatial_reference.ncol, (
                                 "Spatial reference ncol not equal to original data ncol for\n"
                                 + os.path.join(
-                                    *os.path.split(self.original_file_d)[1:], mod_file
-                                )
+                                *os.path.split(self.original_file_d)[1:], mod_file
+                            )
                             )
                 # (stolen from helpers.PstFromFlopyModel()._pp_prep())
                 # but only settting up one set of pps at a time
@@ -2331,7 +2338,7 @@ class PstFrom(object):
                         # zone (all non zero) -- for active domain...
                         if zone_array is None:
                             nr, nc = file_dict[list(file_dict.keys())[0]].shape
-                            zone_array = np.ones((nr,nc))                        
+                            zone_array = np.ones((nr, nc))
                         zone_array[zone_array > 0] = 1  # so can set all
                         # gt-zero to 1
                     if isinstance(pp_space, float):
@@ -2408,7 +2415,6 @@ class PstFrom(object):
                                 if uz < 1:
                                     continue
                                 if uz not in pp_locs.zone.values:
-
                                     missing.append(str(uz))
                             if len(missing) > 0:
                                 self.logger.warn(
@@ -2539,8 +2545,8 @@ class PstFrom(object):
                     "cov": ok_pp.point_cov_df,
                     "zn_ar": zone_array,
                     "sr": spatial_reference,
-                    "pstyle":par_style,
-                    "transform":transform
+                    "pstyle": par_style,
+                    "transform": transform
                 }
                 fac_processed = False
                 for facfile, info in self._pp_facs.items():  # check against
@@ -3185,8 +3191,8 @@ def write_list_tpl(
                     PyemuWarning(msg)
                 for col in use_cols:
                     df_tpl["covgp{0}".format(col)] = df_tpl.loc[
-                        :, "covgp{0}".format(col)
-                    ].str.cat(
+                                                     :, "covgp{0}".format(col)
+                                                     ].str.cat(
                         pd.DataFrame(df_tpl.sidx.to_list()).iloc[:, 0].astype(str),
                         "_cov",
                     )
@@ -3265,7 +3271,6 @@ def _write_direct_df_tpl(
     headerlines=None,
     logger=None,
 ):
-
     """
     Private method to auto-generate parameter or obs names from tabular
     model files (input or output) read into pandas dataframes

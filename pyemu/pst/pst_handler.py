@@ -1826,6 +1826,9 @@ class Pst(object):
             pst_path = os.path.split(new_filename)[0]
             pst_utils.check_interface(self,pst_path)
 
+        # TODO: remove this hack by dgketchum
+        self.control_data.noptmax = 13
+
         vstring = "noptmax:{0}, npar_adj:{1}, nnz_obs:{2}".format(
             self.control_data.noptmax, self.npar_adj, self.nnz_obs
         )
